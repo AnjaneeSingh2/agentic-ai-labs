@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0f14;
+    --panel: #10161d;
+    --line: #1f2b36;
+    --text: #d7dee5;
+    --dim: #7c8b98;
+    --amber: #e2a13f;
+    --teal: #4fa3a0;
+    --error: #d16a6a;
+    --hover: #16202a;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    font-size:14px;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:32px 16px;
+  }
+  .app{
+    width:100%;
+    max-width:1040px;
+    display:flex;
+    gap:12px;
+    height:82vh;
+  }
+
+  /* ---- chat history sidebar ---- */
+  .sidebar{
+    flex:0 0 260px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    border-radius:6px;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .new-chat{
+    margin:12px;
+    background:none;
+    border:1px solid var(--line);
+    color:var(--text);
+    font-family:inherit;
+    font-size:13px;
+    padding:9px 12px;
+    border-radius:4px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .new-chat:hover{ border-color:var(--dim); background:var(--hover); }
+  .new-chat .plus{ color:var(--amber); margin-right:6px; }
+  .side-label{
+    padding:6px 16px 6px;
+    color:var(--dim);
+    font-size:11px;
+    letter-spacing:0.04em;
+  }
+  .chat-list{
+    flex:1;
+    overflow-y:auto;
+    padding:0 8px 12px;
+  }
+  .chat-item{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 10px;
+    border-radius:4px;
+    cursor:pointer;
+    color:var(--dim);
+    font-size:13px;
+  }
+  .chat-item:hover{ background:var(--hover); color:var(--text); }
+  .chat-item.active{ background:var(--hover); color:var(--text); }
+  .chat-item .title{
+    flex:1;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+  }
+  .chat-item .del{
+    visibility:hidden;
+    background:none;
+    border:none;
+    color:var(--dim);
+    font-family:inherit;
+    cursor:pointer;
+    padding:0 2px;
+  }
+  .chat-item:hover .del{ visibility:visible; }
+  .chat-item .del:hover{ color:var(--error); }
+  .empty-list{ padding:8px 10px; color:var(--dim); font-size:12px; }
+
+  .console{
+    flex:1;
+    min-width:0;
+    border:1px solid var(--line);
+    background:var(--panel);
+    border-radius:6px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .console-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--line);
+    color:var(--dim);
+  }
+  .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--line);
+  }
+  .menu-btn{
+    display:none;
+    background:none;
+    border:1px solid var(--line);
+    color:var(--dim);
+    font-family:inherit;
+    font-size:12px;
+    padding:3px 8px;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .console-title{
+    margin-left:6px;
+    font-size:12px;
+    letter-spacing:0.02em;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+  }
+  .status{
+    margin-left:auto;
+    font-size:11px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex:0 0 auto;
+  }
+  .status .pip{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--dim);
+  }
+  .status.ok .pip{ background:var(--teal); }
+  .status.err .pip{ background:var(--error); }
+
+  .log{
+    flex:1;
+    overflow-y:auto;
+    padding:18px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .row{ display:flex; gap:10px; align-items:flex-start; }
+  .who{
+    flex:0 0 auto;
+    width:64px;
+    color:var(--dim);
+    font-size:12px;
+    padding-top:2px;
+  }
+  .row.you .who{ color:var(--amber); }
+  .row.agent .who{ color:var(--teal); }
+  .row.err .who{ color:var(--error); }
+  .msg{
+    flex:1;
+    min-width:0;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    line-height:1.5;
+  }
+  .cites{
+    margin-top:6px;
+    padding-left:10px;
+    border-left:2px solid var(--line);
+    font-size:12px;
+    color:var(--dim);
+  }
+  .cites a{ color:var(--dim); }
+  .cites div{ margin-bottom:2px; }
+
+  .composer{
+    border-top:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    padding:10px 12px;
+    gap:8px;
+  }
+  .prompt-char{
+    color:var(--amber);
+  }
+  .composer input{
+    flex:1;
+    min-width:0;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-family:inherit;
+    font-size:14px;
+    padding:8px 4px;
+  }
+  .composer input::placeholder{ color:var(--dim); }
+  .composer button{
+    background:none;
+    border:1px solid var(--line);
+    color:var(--dim);
+    font-family:inherit;
+    font-size:12px;
+    padding:7px 12px;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .composer button:hover{ color:var(--text); border-color:var(--dim); }
+  .composer button:disabled{ opacity:0.4; cursor:default; }
+
+  .hint{
+    max-width:1040px;
+    width:100%;
+    color:var(--dim);
+    font-size:11px;
+    margin-top:10px;
+    padding:0 4px;
+  }
+
+  /* Narrow screens: sidebar becomes a slide-over toggled from the bar. */
+  @media (max-width: 760px){
+    body{ padding:16px; }
+    .app{ position:relative; height:86vh; }
+    .menu-btn{ display:inline-block; }
+    .console-bar .dot{ display:none; }
+    .sidebar{
+      display:none;
+      position:absolute;
+      z-index:5;
+      top:0; left:0; bottom:0;
+      width:min(280px, 85%);
+      box-shadow:0 8px 24px rgba(0,0,0,0.5);
+    }
+    .app.show-sidebar .sidebar{ display:flex; }
+  }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+</style>
+</head>
+<body>
+
+  <div class="app" id="app">
+    <aside class="sidebar">
+      <button class="new-chat" id="new-chat"><span class="plus">+</span>New chat</button>
+      <div class="side-label">recent</div>
+      <div class="chat-list" id="chat-list"></div>
+    </aside>
+
+    <div class="console">
+      <div class="console-bar">
+        <button class="menu-btn" id="menu-btn" aria-label="Show chat history">chats</button>
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="console-title" id="chat-title">agent session</span>
+        <span class="status ok" id="status"><span class="pip"></span><span id="status-text">ready</span></span>
+      </div>
+
+      <div class="log" id="log"></div>
+
+      <div class="composer">
+        <span class="prompt-char">&gt;</span>
+        <input id="input" type="text" placeholder="Type a question and press Enter…" autofocus>
+        <button id="send">send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">Runs against the OCI Generative AI Agent configured on this instance. Each reply may include sources below it. Chat history is saved in this browser.</div>
+
+<script>
+// Set this to your API Gateway deployment URL, e.g.
+// Relative path — resolves against whatever host/gateway prefix served this page.
+const API_URL = "/multi-agent/chat";
+
+const WELCOME = "Connected. Ask a question about your knowledge base below.";
+const STORE_KEY = 'agentChats';
+const ACTIVE_KEY = 'agentActiveChat';
+const MAX_CHATS = 50;
+
+const app = document.getElementById('app');
+const log = document.getElementById('log');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const statusEl = document.getElementById('status');
+const statusText = document.getElementById('status-text');
+const chatList = document.getElementById('chat-list');
+const chatTitle = document.getElementById('chat-title');
+
+// ---- chat history storage ----
+// Each chat keeps its own OCI session_id plus the messages shown on screen.
+// The Function is stateless between invocations, so the browser holds the
+// session_id and sends it back on every message to keep one continuous
+// conversation. Everything lives in localStorage so it survives reloads.
+// Shape: [{id, title, sessionId, updated, messages:[{who, text, citations}]}]
+function loadChats() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveChats() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(chats.slice(0, MAX_CHATS))); }
+  catch (e) { /* storage full or blocked — history just won't persist */ }
+}
+function setActive(id) {
+  activeId = id;
+  try { localStorage.setItem(ACTIVE_KEY, id || ''); } catch (e) {}
+}
+function getChat(id) { return chats.find(c => c.id === id); }
+
+let chats = loadChats();
+let activeId = null;
+try { activeId = localStorage.getItem(ACTIVE_KEY) || null; } catch (e) {}
+if (activeId && !getChat(activeId)) activeId = null;
+
+function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function makeTitle(text) {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return t.length > 40 ? t.slice(0, 40) + '…' : t;
+}
+
+// ---- rendering ----
+function addRow(who, text, citations) {
+  const row = document.createElement('div');
+  row.className = 'row ' + who;
+  const whoEl = document.createElement('div');
+  whoEl.className = 'who';
+  whoEl.textContent = who === 'you' ? 'you' : (who === 'err' ? 'error' : 'agent');
+  const msgEl = document.createElement('div');
+  msgEl.className = 'msg';
+  msgEl.textContent = text;
+  row.appendChild(whoEl);
+  row.appendChild(msgEl);
+
+  // Drop citations that don't have a real, usable title (e.g. the
+  // placeholder value "unknown" some backends send when no source name
+  // is available) — no point showing a source labeled "unknown".
+  const usableCitations = (citations || []).filter(c =>
+    c && c.title && c.title.trim().toLowerCase() !== 'unknown'
+  );
+
+  if (usableCitations.length) {
+    const cites = document.createElement('div');
+    cites.className = 'cites';
+    usableCitations.forEach((c, i) => {
+      const d = document.createElement('div');
+      if (c.url) {
+        d.innerHTML = `[${i+1}] <a href="${escapeHtml(c.url)}" target="_blank" rel="noopener">${escapeHtml(c.title)}</a>`;
+      } else {
+        d.textContent = `[${i+1}] ${c.title}`;
+      }
+      cites.appendChild(d);
+    });
+    msgEl.appendChild(cites);
+  }
+
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+}
+
+function renderLog() {
+  log.innerHTML = '';
+  addRow('agent', WELCOME);
+  const chat = getChat(activeId);
+  chatTitle.textContent = chat ? chat.title : 'agent session';
+  if (chat) chat.messages.forEach(m => addRow(m.who, m.text, m.citations));
+}
+
+function renderList() {
+  chatList.innerHTML = '';
+  if (!chats.length) {
+    const e = document.createElement('div');
+    e.className = 'empty-list';
+    e.textContent = 'No chats yet.';
+    chatList.appendChild(e);
+    return;
+  }
+  chats.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'chat-item' + (c.id === activeId ? ' active' : '');
+    item.title = c.title;
+    const t = document.createElement('span');
+    t.className = 'title';
+    t.textContent = c.title;
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Delete chat');
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteChat(c.id); });
+    item.appendChild(t);
+    item.appendChild(del);
+    item.addEventListener('click', () => openChat(c.id));
+    chatList.appendChild(item);
+  });
+}
+
+function openChat(id) {
+  setActive(id);
+  renderList();
+  renderLog();
+  app.classList.remove('show-sidebar');
+  input.focus();
+}
+
+function newChat() {
+  // A chat is only created (and listed) once its first message is sent.
+  openChat(null);
+}
+
+function deleteChat(id) {
+  const chat = getChat(id);
+  if (!chat || !confirm(`Delete "${chat.title}"?`)) return;
+  chats = chats.filter(c => c.id !== id);
+  saveChats();
+  if (activeId === id) setActive(null);
+  renderList();
+  renderLog();
+}
+
+// Move a chat to the top of the list when it gets a new message.
+function touch(chat) {
+  chat.updated = Date.now();
+  chats = [chat].concat(chats.filter(c => c.id !== chat.id));
+  saveChats();
+  renderList();
+}
+
+// The agent uses several different phrasings when it can't find an
+// answer in the knowledge base (e.g. "Unsure about the answer...",
+// "I don't know...", "I couldn't find any information..."). We detect
+// any of these "I don't know" style replies and normalize them to one
+// clear, friendly message.
+const FALLBACK_REPLACEMENT = "Sorry, this question is out of scope.";
+const FALLBACK_PATTERNS = [
+  /no relevant information/i,
+  /unsure about the answer/i,
+  /i don'?t know/i,
+  /i am not sure/i,
+  /i'?m not sure/i,
+  /could not find (any )?(relevant )?information/i,
+  /couldn'?t find (any )?(relevant )?information/i,
+  /no (relevant )?information (was )?found/i,
+  /not (able|enough information) to answer/i,
+  /cannot answer (this|that) question/i,
+  /can'?t answer (this|that) question/i,
+  /outside (the|my) (scope|knowledge base)/i
+];
+
+function formatReply(reply) {
+  if (!reply) return reply;
+  const isDontKnow = FALLBACK_PATTERNS.some((re) => re.test(reply));
+  return isDontKnow ? FALLBACK_REPLACEMENT : reply;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML.replace(/"/g, '&quot;');
+}
+
+function checkHealth() {
+  // No separate health route behind the gateway/function -- just confirm
+  // the page itself has been configured with a real gateway URL.
+  if (!API_URL || API_URL.startsWith('REPLACE_WITH')) {
+    statusEl.className = 'status err';
+    statusText.textContent = 'API_URL not set';
+  } else {
+    statusEl.className = 'status ok';
+    statusText.textContent = 'ready';
+  }
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  sendBtn.disabled = true;
+
+  let chat = getChat(activeId);
+  if (!chat) {
+    chat = { id: newId(), title: makeTitle(text), sessionId: null, updated: Date.now(), messages: [] };
+    chats.unshift(chat);
+    setActive(chat.id);
+    chatTitle.textContent = chat.title;
+  }
+  chat.messages.push({ who: 'you', text });
+  touch(chat);
+  addRow('you', text);
+
+  const thinking = document.createElement('div');
+  thinking.className = 'row agent';
+  thinking.innerHTML = '<div class="who">agent</div><div class="msg">…</div>';
+  log.appendChild(thinking);
+  log.scrollTop = log.scrollHeight;
+
+  // The reply belongs to the chat it was sent from, even if the user
+  // switches to another chat while waiting.
+  const showReply = (who, msg, citations) => {
+    chat.messages.push({ who, text: msg, citations });
+    touch(chat);
+    if (activeId === chat.id) addRow(who, msg, citations);
+  };
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text, session_id: chat.sessionId})
+    });
+    const data = await res.json();
+    thinking.remove();
+    if (!res.ok) {
+      if (data.session_expired) {
+        // OCI ended the session (idle timeout). Keep the visible history;
+        // the next message in this chat starts a fresh agent session.
+        chat.sessionId = null;
+        saveChats();
+        showReply('err', (data.error || 'Session expired.') + ' Send your message again to continue in a new session.');
+      } else {
+        showReply('err', data.error || 'Request failed.');
+      }
+    } else {
+      if (data.session_id) chat.sessionId = data.session_id;
+      showReply('agent', formatReply(data.reply), data.citations);
+    }
+  } catch (e) {
+    thinking.remove();
+    showReply('err', 'Network error: ' + e.message);
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+sendBtn.addEventListener('click', send);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') send();
+});
+document.getElementById('new-chat').addEventListener('click', newChat);
+document.getElementById('menu-btn').addEventListener('click', () => app.classList.toggle('show-sidebar'));
+
+checkHealth();
+renderList();
+renderLog();
+</script>
+
+</body>
+</html>
