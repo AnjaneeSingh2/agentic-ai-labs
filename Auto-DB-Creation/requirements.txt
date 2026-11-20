@@ -1,0 +1,4 @@
+--index-url https://pypi.org/simple
+fdk
+oci>=2.126.0
+oracledb
